@@ -21,8 +21,8 @@ public class AuthController {
     }
 
     @PostMapping("/sign-up")
-    public ResponseEntity<?> registration() {
-        return authService.createUser();
+    public ResponseEntity<?> registration(@RequestBody UserRequest userRequest) {
+        return authService.createUser(userRequest);
     }
 
     @GetMapping("/log-out")
