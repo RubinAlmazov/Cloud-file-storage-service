@@ -2,12 +2,10 @@ package org.me.cloudfilestorage.security.controllers;
 
 
 import lombok.RequiredArgsConstructor;
+import org.me.cloudfilestorage.security.dtos.UserRequest;
 import org.me.cloudfilestorage.security.services.AuthService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
@@ -16,14 +14,10 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @GetMapping("/test")
-    public String test() {
-        return "It is works";
-    }
 
-    @GetMapping("/sign-in")
-    public ResponseEntity<?> authorization() {
-        return authService.authorization();
+    @PostMapping("/sign-in")
+    public ResponseEntity<?> authorization(@RequestBody UserRequest userRequest) {
+        return authService.authenticate(userRequest);
     }
 
     @PostMapping("/sign-up")

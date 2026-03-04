@@ -11,6 +11,9 @@ services:
 
   redis:
     image: redis
+    environment:
+      REDIS_PASSWORD: 1234
+      REDIS_HOST: localhost
     ports:
       - "6379:6379"
 
