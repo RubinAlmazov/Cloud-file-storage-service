@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.me.cloudfilestorage.security.dtos.UserRequest;
+import org.me.cloudfilestorage.security.dtos.UserResponse;
 import org.me.cloudfilestorage.security.entities.User;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,9 +49,7 @@ public class AuthService {
         repo.saveContext(securityContext,request, response);
 
 
-        User user = new User();
-        user.setUsername(authentication.getName());
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(new UserResponse(authentication.getName()));
     }
 
     public ResponseEntity<?> createNewUser(UserRequest request) {
@@ -58,6 +57,6 @@ public class AuthService {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Username already exist");
         }
         User user = userService.createUser(request);
-        return ResponseEntity.ok(user.getUsername());
+        return ResponseEntity.ok(new UserResponse(user.getUsername()));
     }
 }

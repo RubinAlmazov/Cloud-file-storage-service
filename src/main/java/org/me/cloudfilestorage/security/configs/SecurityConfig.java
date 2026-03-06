@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -22,8 +23,10 @@ public class SecurityConfig {
         http
                 .cors(AbstractHttpConfigurer::disable)
                 .csrf(AbstractHttpConfigurer::disable)
+                .httpBasic(Customizer.withDefaults())
                 .authorizeHttpRequests((requests) ->  requests
-                                .requestMatchers("/auth/sign-in", "/auth/sign-up", "/test/create", "/test/read").permitAll()
+                                .requestMatchers("/auth/sign-in", "/auth/sign-up").permitAll()
+                                .requestMatchers("/user/me", "/auth/log-out").authenticated()
 
                         )
                 .logout(logout -> logout
