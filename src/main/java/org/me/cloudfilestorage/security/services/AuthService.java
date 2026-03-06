@@ -2,6 +2,8 @@
 
 package org.me.cloudfilestorage.security.services;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.me.cloudfilestorage.security.dtos.UserRequest;
 import org.me.cloudfilestorage.security.entities.User;
@@ -9,8 +11,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.stereotype.Service;
 
 
@@ -23,16 +29,28 @@ public class AuthService {
 
 
 
-    public ResponseEntity<?> authenticate(UserRequest request) {
+    public ResponseEntity<?> authenticate(UserRequest userRequest,  HttpServletRequest request, HttpServletResponse response) {
+        Authentication authentication;
         try {
-            SecurityContextHolder.getContext().setAuthentication(
-                    authenticationManager.authenticate(
-                            new UsernamePasswordAuthenticationToken(request.username(), request.password())));
+                   authentication = authenticationManager.authenticate(
+                            new UsernamePasswordAuthenticationToken(userRequest.username(), userRequest.password()));
+
+
             } catch (AuthenticationException exception) {
                 return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
             }
 
-        return ResponseEntity.ok(SecurityContextHolder.getContext().getAuthentication().getName());
+        SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+        securityContext.setAuthentication(authentication);
+        SecurityContextHolder.setContext(securityContext);
+
+        HttpSessionSecurityContextRepository repo = new HttpSessionSecurityContextRepository();
+        repo.saveContext(securityContext,request, response);
+
+
+        User user = new User();
+        user.setUsername(authentication.getName());
+        return ResponseEntity.ok(user);
     }
 
     public ResponseEntity<?> createNewUser(UserRequest request) {
@@ -41,9 +59,5 @@ public class AuthService {
         }
         User user = userService.createUser(request);
         return ResponseEntity.ok(user.getUsername());
-    }
-
-    public ResponseEntity<?> logout() {
-        return ResponseEntity.ok("ok");
     }
 }
