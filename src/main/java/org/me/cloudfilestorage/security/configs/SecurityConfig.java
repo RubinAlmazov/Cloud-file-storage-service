@@ -26,6 +26,13 @@ public class SecurityConfig {
                 .httpBasic(Customizer.withDefaults())
                 .authorizeHttpRequests((requests) ->  requests
                                 .requestMatchers("/auth/sign-in", "/auth/sign-up").permitAll()
+                                .requestMatchers(
+                                        "/swagger-ui.html",
+                                        "/swagger-ui/**",
+                                        "/v3/api-docs",
+                                        "/v3/api-docs/**",
+                                        "/webjars/**"
+                                ).permitAll()
                                 .requestMatchers("/user/me", "/auth/log-out").authenticated()
 
                         )

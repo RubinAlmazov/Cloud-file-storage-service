@@ -6,11 +6,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.me.cloudfilestorage.security.dtos.UserRequest;
 import org.me.cloudfilestorage.security.services.AuthService;
-import org.springframework.http.HttpRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.http.HttpResponse;
 
 @RestController
 @RequestMapping("/auth")
