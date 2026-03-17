@@ -9,8 +9,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 
@@ -36,4 +37,5 @@ class UserServiceTest {
         assertSame(user, result.get(), "Должен вернуться тот же объект User, что вернул репозиторий");
         verify(userRepository).findByUsername("user_test");
     }
+
 }
