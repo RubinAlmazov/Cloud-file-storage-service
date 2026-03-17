@@ -5,7 +5,7 @@ package org.me.cloudfilestorage.security.services;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.me.cloudfilestorage.kafka.services.KafkaProducerService;
+import org.me.cloudfilestorage.kafka.services.KafkaService;
 import org.me.cloudfilestorage.security.dtos.UserRequest;
 import org.me.cloudfilestorage.security.dtos.UserResponse;
 import org.me.cloudfilestorage.security.entities.User;
@@ -17,7 +17,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.stereotype.Service;
 
@@ -26,7 +25,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final KafkaProducerService kafkaProducerService;
+    private final KafkaService kafkaService;
     private final UserService userService;
     private final AuthenticationManager authenticationManager;
 
@@ -59,7 +58,7 @@ public class AuthService {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Username already exist");
         }
         User user = userService.createUser(request);
-        kafkaProducerService.sendToKafka(user.getId());
+        kafkaService.sendToKafka(user.getId());
         return ResponseEntity.ok(new UserResponse(user.getUsername()));
     }
 }
