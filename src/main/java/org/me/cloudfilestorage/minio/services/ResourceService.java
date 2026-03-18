@@ -1,15 +1,21 @@
+//TODO: add zip downloading, change resource definition in find resource method
 package org.me.cloudfilestorage.minio.services;
 
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
+import io.minio.messages.Item;
 import lombok.AllArgsConstructor;
 import org.me.cloudfilestorage.minio.dtos.ResourceResponse;
+import org.me.cloudfilestorage.minio.enums.ResourceType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 @Service
 public class ResourceService {
@@ -68,11 +74,13 @@ public class ResourceService {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No such path");
         }
 
+        ResourceType type = path.endsWith("/") ? ResourceType.DIRECTORY : ResourceType.FILE;
+
         ResourceResponse response = new ResourceResponse(
                 path,
                 stats.bucket(),
                 stats.size(),
-                stats.contentType()
+                type
         );
 
         return ResponseEntity.ok(response);
@@ -99,20 +107,48 @@ public class ResourceService {
     }
 
     public ResponseEntity<?> downloadResource(String path, OutputStream outputStream) throws Exception{
-        try (InputStream stream = minioClient.getObject(GetObjectArgs.builder()
-                .bucket(bucketName)
-                .object(path)
-                .build()) )
-        {
-            byte[] buffer = new byte[8192];
-            int byteRead;
-            while ( (byteRead = stream.read(buffer)) != -1) {
+        ResourceType type = path.endsWith("/") ? ResourceType.DIRECTORY : ResourceType.FILE;
+        if (type.equals(ResourceType.FILE)) {
+            try (InputStream stream = minioClient.getObject(GetObjectArgs.builder()
+                    .bucket(bucketName)
+                    .object(path)
+                    .build()) )
+            {
+                byte[] buffer = new byte[8192];
+                int byteRead;
+                while ( (byteRead = stream.read(buffer)) != -1) {
 
-                outputStream.write(buffer, 0, byteRead);
+                    outputStream.write(buffer, 0, byteRead);
+                }
+
+
+            } catch (ErrorResponseException e) {
+                throw e;
             }
 
-        } catch (ErrorResponseException e) {
-            throw e;
+        }
+        else {
+            ZipOutputStream zipOutputStream = new ZipOutputStream(outputStream);
+            Iterable<Result<Item>> results = minioClient.listObjects(ListObjectsArgs.builder().bucket(bucketName).prefix(path).recursive(true).build());
+            for (Result<Item> result : results) {
+                String objectName = result.get().objectName();
+                if (objectName.endsWith("/")) {
+                    continue;
+                }
+                try (InputStream stream = minioClient.getObject(GetObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectName)
+                        .build()) )
+                {
+                    ZipEntry zipEntry = new ZipEntry(objectName.substring(path.length()));
+                    zipOutputStream.putNextEntry(zipEntry);
+                    stream.transferTo(zipOutputStream);
+                    zipOutputStream.closeEntry();
+                } catch (ErrorResponseException e) {
+                    throw e;
+                }
+            }
+            zipOutputStream.close();
         }
 
         return new ResponseEntity<>(HttpStatus.OK);

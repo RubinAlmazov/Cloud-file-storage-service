@@ -1,4 +1,4 @@
-//TODO: add E2E test
+//TODO: add E2E test, figure out how ByteOutputStream works
 package org.me.cloudfilestorage.minio.services;
 
 import io.minio.*;
@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.me.cloudfilestorage.minio.dtos.ResourceResponse;
+import org.me.cloudfilestorage.minio.enums.ResourceType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
@@ -20,7 +21,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
-import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -83,9 +87,9 @@ class ResourceServiceTest {
     }
 
     @Test
-    void testFindResource_ShouldReturnResource() throws Exception{
+    void testFindResource_ShouldReturnFile() throws Exception{
         String bucketName = "files-users";
-        String folderName = "files-" + 2 + "-users/";
+        String folderName = "files-" + 2 + "-users/info.txt";
         minioClient.putObject(
                 PutObjectArgs.builder()
                         .bucket(bucketName)
@@ -100,7 +104,28 @@ class ResourceServiceTest {
         assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(responseResource.name()).isEqualTo(bucketName);
         assertThat(responseResource.size()).isEqualTo(0);
-        assertThat(responseResource.type()).isEqualTo("application/octet-stream");
+        assertThat(responseResource.type()).isEqualTo(ResourceType.FILE);
+    }
+
+    @Test
+    void testFindResource_ShouldReturnDirectory() throws Exception{
+        String bucketName = "files-users";
+        String folderName = "files-" + 2.1 + "-users/";
+        minioClient.putObject(
+                PutObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(folderName)
+                        .stream(new ByteArrayInputStream(new byte[] {}), 0, -1)
+                        .build()
+        );
+
+        ResponseEntity<?> responseEntity = resourceService.findResource(folderName);
+        assertThat(responseEntity.getBody()).isInstanceOf(ResourceResponse.class);
+        ResourceResponse responseResource = (ResourceResponse) responseEntity.getBody();
+        assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(responseResource.name()).isEqualTo(bucketName);
+        assertThat(responseResource.size()).isEqualTo(0);
+        assertThat(responseResource.type()).isEqualTo(ResourceType.DIRECTORY);
     }
 
     @Test
@@ -122,26 +147,70 @@ class ResourceServiceTest {
     }
 
     @Test
-    void testDownloadResource_ShouldReturnResource() throws Exception {
+    void testDownloadResource_ShouldReturnFile() throws Exception {
         String bucketName = "files-users";
-        String folderName = "files-" + 4 + "-users/";
+        String fileName = "files-" + 4 + "-users/info.txt";
         byte[] expect = "its a test".getBytes();
         minioClient.putObject(
                 PutObjectArgs.builder()
                         .bucket(bucketName)
-                        .object(folderName)
+                        .object(fileName)
                         .stream(new ByteArrayInputStream(expect), expect.length, -1)
                         .build()
         );
 
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
+        ResponseEntity<?> responseEntity = resourceService.downloadResource(fileName, byteArrayOutputStream);
+        assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        byte[] content = byteArrayOutputStream.toByteArray();
+        assertThat(content).isNotEmpty();
+        assertThat(content).isEqualTo(expect);
+    }
+
+    @Test
+    void testDownloadResource_ShouldReturnDirectory() throws Exception {
+        String bucketName = "files-users";
+        String folderName = "files-" + 4.1 + "-users/";
+        String content = "its an info";
+        minioClient.putObject(
+                PutObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(folderName + "user1_info")
+                        .stream(new ByteArrayInputStream((content + " user1").getBytes()), (content + " user1").getBytes().length, -1)
+                        .build()
+        );
+        minioClient.putObject(
+                PutObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(folderName + "user2_info")
+                        .stream(new ByteArrayInputStream((content + " user2").getBytes()) , (content + " user2").getBytes().length, -1)
+                        .build()
+        );
+
+        assertThat(minioClient.listObjects(ListObjectsArgs.builder().bucket(bucketName).prefix(folderName).build())).hasSize(2);
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
         ResponseEntity<?> responseEntity = resourceService.downloadResource(folderName, byteArrayOutputStream);
         assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-        byte[] content  = byteArrayOutputStream.toByteArray();
-        assertThat(content).isNotEmpty();
-        assertThat(content).isEqualTo(expect);
+        List<String> objectNames = new ArrayList<>();
+        Map<String, String> objectsContent = new HashMap<>();
 
+        byte[] bytes = byteArrayOutputStream.toByteArray();
+
+        try (ZipInputStream zipInputStream = new ZipInputStream(new ByteArrayInputStream(bytes))) {
+            ZipEntry zipEntry;
+            while ((zipEntry = zipInputStream.getNextEntry()) != null) {
+                objectNames.add(zipEntry.getName());
+
+                String contents = new String(zipInputStream.readAllBytes(), StandardCharsets.UTF_8);
+                objectsContent.put(zipEntry.getName(), contents);
+            }
+        }
+
+        assertThat(objectsContent.get("user1_info")).contains("its an info user1");
+        assertThat(objectsContent.get("user2_info")).contains("its an info user2");
     }
 }
