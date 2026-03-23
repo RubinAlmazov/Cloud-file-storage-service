@@ -231,17 +231,20 @@ class ResourceServiceTest {
 
         ResponseEntity<?> responseEntity = resourceService.renameResource(path,path2);
         String fileContent;
+        long size;
         try (InputStream inputStream = minioClient.getObject(GetObjectArgs.builder().bucket(bucketName).object(path2).build())) {
 
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
             inputStream.transferTo(byteArrayOutputStream);
             byte[] content2 = byteArrayOutputStream.toByteArray();
             fileContent = new String(content2, StandardCharsets.UTF_8);
+            size = byteArrayOutputStream.size();
 
         }
         assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(fileContent).isEqualTo(content + " user5");
         assertThrows(ErrorResponseException.class, () -> minioClient.statObject(StatObjectArgs.builder().bucket(bucketName).object(path).build()));
+        assertThat(responseEntity.getBody()).isEqualTo(new ResourceResponse("files-" + 5 + "-users/", "files-" + 5.1 + "-users/", size, ResourceType.FILE));
     }
 
     @Test
@@ -266,8 +269,6 @@ class ResourceServiceTest {
 
         ResponseEntity<?> responseEntity = resourceService.renameResource(path,path2);
         assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThrows(ErrorResponseException.class, () -> minioClient.statObject(StatObjectArgs.builder().bucket(bucketName).object(path).build()));
-        assertThat(responseEntity.getBody()).isEqualTo(ResourceType.DIRECTORY);
 
         Map<String, String> objectsContent = new HashMap<>();
         Iterable<Result<Item>> resultIterable = minioClient.listObjects(ListObjectsArgs.builder().bucket(bucketName).prefix(path2).recursive(true).build());
@@ -285,6 +286,8 @@ class ResourceServiceTest {
         assertThat(objectsContent.get(path2 + "user_info_1")).isEqualTo("its an user 6 info");
         assertThat(objectsContent.get(path2 + "user_info_2")).isEqualTo("its an user 7 info");
         assertThrows(ErrorResponseException.class, () -> minioClient.statObject(StatObjectArgs.builder().bucket(bucketName).object(path).build()));
+        assertThat(responseEntity.getBody()).isEqualTo(new ResourceResponse("files-" + 6 + "-users/", "files-" + 6.1 + "-users/", 0, ResourceType.DIRECTORY));
+
     }
 
 }

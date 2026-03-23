@@ -163,7 +163,7 @@ public class ResourceService {
 //        if (!path2.substring(0, path.lastIndexOf("/")+1).equals(pathDirectory)) {
 //            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Paths to directory doesnt match");
 //        }
-
+        ResourceResponse resourceResponse;
         ResourceType resourceType = path.endsWith("/") ? ResourceType.DIRECTORY : ResourceType.FILE;
         if (resourceType.equals(ResourceType.FILE)) {
             try (InputStream inputStream = minioClient.getObject(GetObjectArgs.builder().bucket(bucketName).object(path).build())) {
@@ -184,6 +184,8 @@ public class ResourceService {
                 minioClient.putObject(PutObjectArgs.builder()
                         .bucket(bucketName).object(path2).stream(new ByteArrayInputStream(fileContent), fileContent.length, -1)
                         .build());
+
+                resourceResponse = new ResourceResponse(path, path2, byteArrayOutputStream.size(), resourceType);
             }
             catch (ErrorResponseException e) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No such path");
@@ -211,9 +213,11 @@ public class ResourceService {
                 }
             }
             minioClient.removeObject(RemoveObjectArgs.builder().bucket(bucketName).object(path).build());
+
+            resourceResponse = new ResourceResponse(path, path2, 0, resourceType);
         }
 
-        return ResponseEntity.ok(ResourceType.DIRECTORY);
+        return ResponseEntity.ok(resourceResponse);
 
     }
 }
