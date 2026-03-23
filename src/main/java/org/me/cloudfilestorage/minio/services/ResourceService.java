@@ -1,4 +1,4 @@
-//TODO: add zip downloading, change resource definition in find resource method
+
 package org.me.cloudfilestorage.minio.services;
 
 import io.minio.*;
@@ -11,8 +11,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.xmlunit.builder.Input;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -152,5 +155,65 @@ public class ResourceService {
         }
 
         return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    //TODO:find out is it necessary with second try block in rename method
+    public ResponseEntity<?> renameResource(String path, String path2) throws Exception{
+        String pathDirectory = path.substring(0, path.lastIndexOf("/") + 1);
+//        if (!path2.substring(0, path.lastIndexOf("/")+1).equals(pathDirectory)) {
+//            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Paths to directory doesnt match");
+//        }
+
+        ResourceType resourceType = path.endsWith("/") ? ResourceType.DIRECTORY : ResourceType.FILE;
+        if (resourceType.equals(ResourceType.FILE)) {
+            try (InputStream inputStream = minioClient.getObject(GetObjectArgs.builder().bucket(bucketName).object(path).build())) {
+                Iterable<Result<Item>> listOfObjects = minioClient.listObjects(ListObjectsArgs.builder()
+                        .bucket(bucketName).prefix(pathDirectory).build());
+                for (Result<Item> result : listOfObjects) {
+                    if (result.get().objectName().equals(path2)) {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("File already exist");
+                    }
+                }
+
+                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                inputStream.transferTo(byteArrayOutputStream);
+                byte[] fileContent = byteArrayOutputStream.toByteArray();
+
+                minioClient.removeObject(RemoveObjectArgs.builder().bucket(bucketName).object(path).build());
+
+                minioClient.putObject(PutObjectArgs.builder()
+                        .bucket(bucketName).object(path2).stream(new ByteArrayInputStream(fileContent), fileContent.length, -1)
+                        .build());
+            }
+            catch (ErrorResponseException e) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No such path");
+            }
+
+        }
+        else {
+            //TODO: add validation for directory, find out is it necessary to add try block
+
+            Iterable<Result<Item>> listOfObjects = minioClient.listObjects(ListObjectsArgs.builder()
+                    .bucket(bucketName).prefix(path).recursive(true).build());
+
+
+            for (Result<Item> result : listOfObjects) {
+                String objectName = result.get().objectName();
+                try (InputStream inputStream = minioClient.getObject(GetObjectArgs.builder().bucket(bucketName).object(objectName).build())) {
+
+                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                    inputStream.transferTo(byteArrayOutputStream);
+                    byte[] fileContent = byteArrayOutputStream.toByteArray();
+
+                    minioClient.putObject(PutObjectArgs.builder()
+                            .bucket(bucketName).object(path2 + objectName.substring(objectName.lastIndexOf("/"))).stream(new ByteArrayInputStream(fileContent), fileContent.length, -1)
+                            .build());
+                }
+            }
+            minioClient.removeObject(RemoveObjectArgs.builder().bucket(bucketName).object(path).build());
+        }
+
+        return ResponseEntity.ok(ResourceType.DIRECTORY);
+
     }
 }

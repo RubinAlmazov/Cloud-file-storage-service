@@ -32,4 +32,10 @@ public class ResourceController {
         resourceService.downloadResource(path, response.getOutputStream());
 
     }
+
+    @GetMapping("/rename")
+    public ResponseEntity<?> renameResource(@RequestParam String path, @RequestParam String path2) throws Exception {
+        return resourceService.renameResource(path, path2);
+    }
 }
+
