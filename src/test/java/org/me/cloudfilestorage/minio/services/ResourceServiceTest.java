@@ -244,7 +244,7 @@ class ResourceServiceTest {
         assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(fileContent).isEqualTo(content + " user5");
         assertThrows(ErrorResponseException.class, () -> minioClient.statObject(StatObjectArgs.builder().bucket(bucketName).object(path).build()));
-        assertThat(responseEntity.getBody()).isEqualTo(new ResourceResponse("files-" + 5 + "-users/", "files-" + 5.1 + "-users/", size, ResourceType.FILE));
+        assertThat(responseEntity.getBody()).isEqualTo(new ResourceResponse("files-" + 5 + "-users", "files-" + 5.1 + "-users", size, ResourceType.FILE));
     }
 
     @Test
@@ -286,8 +286,85 @@ class ResourceServiceTest {
         assertThat(objectsContent.get(path2 + "user_info_1")).isEqualTo("its an user 6 info");
         assertThat(objectsContent.get(path2 + "user_info_2")).isEqualTo("its an user 7 info");
         assertThrows(ErrorResponseException.class, () -> minioClient.statObject(StatObjectArgs.builder().bucket(bucketName).object(path).build()));
-        assertThat(responseEntity.getBody()).isEqualTo(new ResourceResponse("files-" + 6 + "-users/", "files-" + 6.1 + "-users/", 0, ResourceType.DIRECTORY));
+        assertThat(responseEntity.getBody()).isEqualTo(
+                new ResourceResponse("files-" + 6 + "-users/", "files-" + 6.1 + "-users/", 0, ResourceType.DIRECTORY));
 
+    }
+
+    @Test
+    void testFindResourceByQueryWhenItIsEmpty_ShouldReturnOk() throws Exception {
+        String bucketName = "files-users";
+        String path = "files-" + 7 + "-users/";
+        minioClient.putObject(
+                PutObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(path + "user_info_1")
+                        .stream(new ByteArrayInputStream(("its an user 7 info one").getBytes()), ("its an user 7 info one").getBytes().length, -1)
+                        .build()
+        );
+        minioClient.putObject(
+                PutObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(path + "user_info_2")
+                        .stream(new ByteArrayInputStream(("its an user 7 info two").getBytes()), ("its an user 7 info two").getBytes().length, -1)
+                        .build()
+        );
+
+        ResponseEntity<?> responseEntity = resourceService.findResourceByQuery("");
+
+        ArrayList<ResourceResponse> resourceResponses = new ArrayList<>();
+        resourceResponses.add(new ResourceResponse(
+                "files-" + 7 + "-users/",
+                "user_info_1",
+                0,
+                ResourceType.DIRECTORY));
+        resourceResponses.add(new ResourceResponse(
+                "files-" + 7 + "-users/",
+                "user_info_2",
+                0,
+                ResourceType.DIRECTORY));
+
+
+        assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(responseEntity.getBody()).isEqualTo(resourceResponses);
+    }
+
+    @Test
+    void testFindResourceByQueryWhenItIsNotEmpty_ShouldReturnOk() throws Exception {
+        String bucketName = "files-users";
+        String path = "files-" + 7 + "-users/";
+        minioClient.putObject(
+                PutObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(path + "info_1")
+                        .stream(new ByteArrayInputStream(("its an user 7 info one").getBytes()), ("its an user 7 info one").getBytes().length, -1)
+                        .build()
+        );
+        minioClient.putObject(
+                PutObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(path + "info_user2")
+                        .stream(new ByteArrayInputStream(("its an user 7 info two").getBytes()), ("its an user 7 info two").getBytes().length, -1)
+                        .build()
+        );
+
+        ResponseEntity<?> responseEntity = resourceService.findResourceByQuery("info");
+
+        ArrayList<ResourceResponse> resourceResponses = new ArrayList<>();
+        resourceResponses.add(new ResourceResponse(
+                "files-" + 7 + "-users/",
+                "info_1",
+                0,
+                ResourceType.DIRECTORY));
+        resourceResponses.add(new ResourceResponse(
+                "files-" + 7 + "-users/",
+                "info_user2",
+                0,
+                ResourceType.DIRECTORY));
+
+
+        assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(responseEntity.getBody()).isEqualTo(resourceResponses);
     }
 
 }

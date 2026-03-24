@@ -218,6 +218,51 @@ public class ResourceService {
         }
 
         return ResponseEntity.ok(resourceResponse);
+    }
 
+
+    public ResponseEntity<?> findResourceByQuery(String query) {
+        if (query.matches(".*[0-9/?'].*")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid characters used");
+        }
+
+        List<ResourceResponse> matches = new ArrayList<>();
+        try {
+            Iterable<Result<Item>> results = minioClient.listObjects(ListObjectsArgs.builder().bucket(bucketName).build());
+
+            for (Result<Item> result : results) {
+                String objectName = result.get().objectName();
+                ResourceType resourceType = result.get().isDir() ? ResourceType.DIRECTORY : ResourceType.FILE;
+                long size = resourceType.equals(ResourceType.FILE) ? result.get().size() : 0;
+
+                Iterable<Result<Item>> fileNames = minioClient.listObjects(ListObjectsArgs.builder().bucket(bucketName).prefix(objectName).build());
+                for (Result<Item> fileName : fileNames) {
+                    if (query.isEmpty()) {
+                        matches.add(new ResourceResponse(
+                                objectName,
+                                fileName.get().objectName().substring(objectName.lastIndexOf("/")+1),
+                                size, resourceType));
+                    }
+                    else  {
+                        if ((objectName + fileName.get().objectName()).contains(query) ) {
+                            matches.add(new ResourceResponse(
+                                    objectName,
+                                    fileName.get().objectName().substring(objectName.lastIndexOf("/")+1),
+                                     size, resourceType));
+                        }
+                    }
+
+                }
+            }
+
+            if (matches.isEmpty()) {
+                return ResponseEntity.ok(new int[] {});
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("An error occurred while accessing the file storage.");
+        }
+
+        return ResponseEntity.ok(matches);
     }
 }
