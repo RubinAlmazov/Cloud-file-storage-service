@@ -1,0 +1,9 @@
+/*
+!/CloudFileStorage
+!/MyTinyParser
+**/target/
+**/.idea/
+**/.git/
+**/*.iml
+**/HELP.md
+**/cookies.txt

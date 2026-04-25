@@ -14,7 +14,7 @@ public class KafkaService {
     private final ResourceService resourceService;
 
     public void sendToKafka(Integer userId) {
-        kafkaTemplate.send("usersId", userId.toString());
+        kafkaTemplate.send("userId", userId.toString());
     }
 
     @KafkaListener(topics = "userId")

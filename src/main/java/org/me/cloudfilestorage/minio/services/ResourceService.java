@@ -4,20 +4,20 @@ package org.me.cloudfilestorage.minio.services;
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
 import io.minio.messages.Item;
-import lombok.AllArgsConstructor;
+import jakarta.servlet.http.HttpServletRequest;
 import org.me.cloudfilestorage.minio.dtos.ResourceResponse;
 import org.me.cloudfilestorage.minio.enums.ResourceType;
+import org.me.mytinyparser.dto.Parts;
+import org.me.mytinyparser.MyTinyParserApplication;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.xmlunit.builder.Input;
 
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 @Service
@@ -264,5 +264,75 @@ public class ResourceService {
         }
 
         return ResponseEntity.ok(matches);
+    }
+
+    public ResponseEntity<?> uploadResource(String path, HttpServletRequest request) {
+        List<ResourceResponse> resourceResponses = new ArrayList<>();
+        try {
+            MyTinyParserApplication tinyParserApplication = new MyTinyParserApplication();
+            List<Parts> parts = tinyParserApplication.parseAll(request);
+
+            for (Parts part : parts) {
+                minioClient.putObject(PutObjectArgs.builder()
+                        .bucket(bucketName).object(path + part.contentDisposition().getFileName()).stream(part.resourceContent(),
+                                part.size(),-1 ).build());
+
+                ResourceResponse resourceResponse = new ResourceResponse(path,
+                        part.contentDisposition().getFileName(), part.size(), ResourceType.FILE);
+                resourceResponses.add(resourceResponse);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return ResponseEntity.ok(resourceResponses);
+    }
+
+    public ResponseEntity<?> getListOfFolders() {
+        List<String> listOfFolders = new ArrayList<>();
+        try {
+            Iterable<Result<Item>> listOfObjects = minioClient.listObjects(ListObjectsArgs.builder().bucket(bucketName).build());
+            for (Result<Item> item : listOfObjects) {
+                listOfFolders.add(item.get().objectName());
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        return !listOfFolders.isEmpty() ? ResponseEntity.ok(listOfFolders) : ResponseEntity.ok("No folders");
+    }
+
+    public ResponseEntity<?> getDirectoryInfo(String path) {
+        List<ResourceResponse> resourceResponses = new ArrayList<>();
+        try {
+            Iterable<Result<Item>> listOfObjects = minioClient.listObjects(ListObjectsArgs.builder().bucket(bucketName).prefix(path).build());
+            for (Result<Item> item : listOfObjects) {
+                String folderPath = item.get().objectName();
+                resourceResponses.add(new ResourceResponse(
+                        folderPath,
+                        folderPath.substring(folderPath.lastIndexOf("/")+1),
+                        item.get().size(), ResourceType.FILE));
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        return ResponseEntity.ok(resourceResponses);
+    }
+
+
+    public ResponseEntity<?> createEmptyFolder(String path) throws Exception{
+        try {
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(path)
+                            .stream(new ByteArrayInputStream(new byte[] {}), 0, -1)
+                            .build()
+            );
+        } catch (ErrorResponseException e) {
+            throw new RuntimeException("Folder already exists");
+        }
+        return ResponseEntity.ok(HttpStatus.CREATED);
     }
 }
